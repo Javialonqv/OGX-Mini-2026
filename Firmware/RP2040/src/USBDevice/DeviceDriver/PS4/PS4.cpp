@@ -1,3 +1,4 @@
+#include <cstddef>
 #include <cstring>
 #include <algorithm>
 
@@ -234,10 +235,14 @@ void PS4Device::process(const uint8_t idx, Gamepad& gamepad)
 	}
 
 	if (new_report_out_) {
-		Gamepad::PadOut gp_out;
-		gp_out.rumble_l = report_out_.motor_left;
-		gp_out.rumble_r = report_out_.motor_right;
-		gamepad.set_pad_out(gp_out);
+		/* Only take the motors when the host marked them valid. A lightbar-only update carries
+		 * zero motor bytes, which would stop a running rumble. */
+		if (report_out_.set_rumble) {
+			Gamepad::PadOut gp_out;
+			gp_out.rumble_l = report_out_.motor_left;
+			gp_out.rumble_r = report_out_.motor_right;
+			gamepad.set_pad_out(gp_out);
+		}
 		new_report_out_ = false;
 	}
 }
@@ -247,8 +252,10 @@ uint16_t PS4Device::get_report_cb(uint8_t itf, uint8_t report_id, hid_report_typ
 	(void)itf;
 	if (report_type == HID_REPORT_TYPE_INPUT) {
 		if (report_id == 0 || report_id == kReportIdIn) {
-			const uint16_t n = static_cast<uint16_t>(std::min<size_t>(reqlen, report_in_.size()));
-			std::memcpy(buffer, report_in_.data(), n);
+			/* With a report ID, TinyUSB already puts it in front of the buffer: skip ours. */
+			const size_t skip = (report_id == 0) ? 0 : 1;
+			const uint16_t n = static_cast<uint16_t>(std::min<size_t>(reqlen, report_in_.size() - skip));
+			std::memcpy(buffer, report_in_.data() + skip, n);
 			return n;
 		}
 	} else if (report_type == HID_REPORT_TYPE_FEATURE) {
@@ -272,8 +279,13 @@ void PS4Device::set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_t 
 		len = static_cast<uint16_t>(len - 1u);
 		buf = &buffer[1];
 	}
-	if (rid == 0x05 && len >= sizeof(PS4::OutReport)) {
-		std::memcpy(&report_out_, buf, sizeof(PS4::OutReport));
+	/* buf holds the report after its ID (31 bytes from Linux hid-playstation and SDL), while
+	 * PS4::OutReport starts with the ID field: the old size check dropped every report. Copy the
+	 * body after the ID field; it must reach at least the lightbar colour. */
+	constexpr size_t kMinBody = offsetof(PS4::OutReport, lightbar_blue);
+	if (rid == 0x05 && len >= kMinBody) {
+		uint8_t* out = reinterpret_cast<uint8_t*>(&report_out_) + 1;
+		std::memcpy(out, buf, std::min<size_t>(len, sizeof(PS4::OutReport) - 1));
 		new_report_out_ = true;
 	}
 }
