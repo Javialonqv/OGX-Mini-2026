@@ -62,7 +62,7 @@ Bluepad32 (Pico W / Pico 2 W) and most USB host drivers (XInput, DualShock 3/4/5
 | Guide / PS / Home | **SYS** |
 | Share / Capture | **MISC** (when present) |
 
-**Disconnect combo (Bluetooth):** **Start + Back** (~0.5 s). **OUYA:** **L3 + R3** (no Start/Select).
+**Disconnect combo (Bluetooth):** hold **Start + Back** for **3 s**. **OUYA:** **L3 + R3** (no Start/Select). Joy-Cons are asked to sleep (they turn off, like on the console).
 
 ### Steam Controller 2026 / Triton (Bluetooth LE)
 
