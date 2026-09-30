@@ -147,9 +147,13 @@ static uint32_t s_last_bt_input_ms[CONFIG_BLUEPAD32_MAX_DEVICES]{};
 static uint32_t s_xbox_ble_ka_last_ms[CONFIG_BLUEPAD32_MAX_DEVICES]{};
 static uint32_t s_sw2_ble_ka_last_ms[CONFIG_BLUEPAD32_MAX_DEVICES]{};
 /** Ignore Start+Select disconnect combo for this long after connect (DS4 can glitch both on first reports). */
-static uint32_t s_bt_disconnect_combo_grace_until_ms[MAX_GAMEPADS]{};
+/* The per-pad state arrays below are indexed both by OGX pad and by Bluetooth slot
+ * (disconnect callback, feedback loop). Sized MAX_GAMEPADS (1 on single-player builds), a pad in
+ * slot 1 (e.g. the right Joy-Con of a pair, on every disconnect) wrote past them into other
+ * variables. Size them for every Bluetooth slot (CONFIG_BLUEPAD32_MAX_DEVICES >= MAX_GAMEPADS). */
+static uint32_t s_bt_disconnect_combo_grace_until_ms[CONFIG_BLUEPAD32_MAX_DEVICES]{};
 /** DS4 BT: delay rumble output (host can request rumble immediately; early FF reports can drop link). */
-static uint32_t s_ps4_rumble_ok_ms[MAX_GAMEPADS]{};
+static uint32_t s_ps4_rumble_ok_ms[CONFIG_BLUEPAD32_MAX_DEVICES]{};
 
 struct BTDevice {
     bool connected{false};
@@ -202,10 +206,18 @@ static void gpio_process_timer_cb(btstack_timer_source_t* ts) {
 }
 
 // PS5: touchpad click toggles adaptive triggers (per-controller state)
-static bool adaptive_trigger_enabled_[MAX_GAMEPADS]{false};
-static bool prev_touchpad_clicked_[MAX_GAMEPADS]{false};
+static bool adaptive_trigger_enabled_[CONFIG_BLUEPAD32_MAX_DEVICES]{false};
+static bool prev_touchpad_clicked_[CONFIG_BLUEPAD32_MAX_DEVICES]{false};
 // Defer sending adaptive trigger effect out of BT callback to avoid l2cap_send in callback (reduces input lag)
-static bool pending_adaptive_trigger_send_[MAX_GAMEPADS]{false};
+static bool pending_adaptive_trigger_send_[CONFIG_BLUEPAD32_MAX_DEVICES]{false};
+/* Regression guard: keep the arrays above sized per Bluetooth slot. */
+template <typename T, size_t N>
+constexpr size_t bt_slots_of(const T (&)[N]) { return N; }
+static_assert(bt_slots_of(s_bt_disconnect_combo_grace_until_ms) >= CONFIG_BLUEPAD32_MAX_DEVICES, "sized per BT slot");
+static_assert(bt_slots_of(s_ps4_rumble_ok_ms) >= CONFIG_BLUEPAD32_MAX_DEVICES, "sized per BT slot");
+static_assert(bt_slots_of(adaptive_trigger_enabled_) >= CONFIG_BLUEPAD32_MAX_DEVICES, "sized per BT slot");
+static_assert(bt_slots_of(prev_touchpad_clicked_) >= CONFIG_BLUEPAD32_MAX_DEVICES, "sized per BT slot");
+static_assert(bt_slots_of(pending_adaptive_trigger_send_) >= CONFIG_BLUEPAD32_MAX_DEVICES, "sized per BT slot");
 
 bool any_connected()
 {
