@@ -122,7 +122,7 @@ Switch 1 Pro (`0x2009`) uses `SwitchProHost` with deliberate swaps vs a 1:1 Pro 
 | **− / +** | **Back / Start** |
 | **Home** | **SYS** |
 | **Capture** | **MISC** |
-| **L3 / R3** | **R3 / L3** (swapped) |
+| **L3 / R3** | **L3 / R3** |
 | D-pad Up/Down/Left/Right | D-pad **Down/Up/Right/Left** (swapped) |
 
 Sticks are scaled to `PadIn` int16 range. IMU is available for **PS3/PS4 output** motion passthrough.
@@ -144,7 +144,7 @@ Switch 2 Pro (`0x2069`) uses `Switch2ProHost` with **Switch-2-specific** bit pos
 | Stick **R3** (misc bit 7) | **R3** |
 | **Home** (left byte) | **SYS** |
 | **ZL / ZR** digital bits | **trigger_l / trigger_r** (digital) |
-| D-pad (misc − / L3 / + / R3 bit positions) | D-pad |
+| D-pad (misc bits `0x01` / `0x04` / `0x02` / `0x08`: down / left / right / up) | D-pad |
 
 Sticks use the same 12-bit packing as Switch 1 Pro, with **Y inverted** into PadIn. **Anti-deadzone** profiles apply a small noise floor (~8%) when inner deadzone is unset so imperfect stick centers do not drift.
 
