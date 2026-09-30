@@ -178,7 +178,7 @@ static void schedule_disconnect_combo(int idx)
 
 static constexpr uint32_t FEEDBACK_TIME_MS = 250;
 static_assert(FEEDBACK_TIME_MS == switch_rumble::kFeedbackPeriodMs, "keep Bluepad32/RumbleRefresh.h in sync");
-/* neutral rumble refresh for Switch pads while idle (see Bluepad32/RumbleRefresh.h). */
+/* Neutral rumble refresh for Switch pads while idle (see Bluepad32/RumbleRefresh.h). */
 static switch_rumble::IdleRefresh s_sw_idle_rumble[CONFIG_BLUEPAD32_MAX_DEVICES];
 static constexpr uint32_t LED_CHECK_TIME_MS = 500;
 /** Idle pairing health check — restarts BR/LE scan if they died during long USB suspend (e.g. 360 standby). */
@@ -348,7 +348,7 @@ void set_rumble(uni_hid_device_t* bp_device, uint16_t length, uint8_t rumble_l, 
         case CONTROLLER_TYPE_SwitchProController:
         case CONTROLLER_TYPE_SwitchJoyConRight:
         case CONTROLLER_TYPE_SwitchJoyConLeft:
-            /* outlive the feedback period so a long rumble isn't stopped and restarted on
+            /* Outlive the feedback period so a long rumble isn't stopped and restarted on
              * every cycle (see Bluepad32/RumbleRefresh.h). */
             (void)length;
             uni_hid_parser_switch_play_dual_rumble(bp_device, 0, switch_rumble::kRumbleDurationMs, rumble_l, rumble_r);
