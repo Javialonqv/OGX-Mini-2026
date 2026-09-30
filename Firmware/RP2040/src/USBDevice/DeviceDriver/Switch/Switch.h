@@ -7,6 +7,7 @@
 
 #include "USBDevice/DeviceDriver/DeviceDriver.h"
 #include "Descriptors/SwitchProDevice.h"
+#include "USBDevice/DeviceDriver/Switch/HdRumble.h"
 
 class SwitchDevice : public DeviceDriver
 {
@@ -43,6 +44,9 @@ private:
     std::array<uint8_t, 6> addr_ = { 0x7C, 0xBB, 0x8A, 0x12, 0x34, 0x56 };
 
     // Latest rumble decoded from host 0x01/0x10/0x11 output; applied in process().
+    // HD rumble is stateful, so each motor keeps its own decoder.
+    hd_rumble::Decoder rumble_dec_l_;
+    hd_rumble::Decoder rumble_dec_r_;
     uint8_t rumble_l_ = 0;
     uint8_t rumble_r_ = 0;
     bool rumble_dirty_ = false;
