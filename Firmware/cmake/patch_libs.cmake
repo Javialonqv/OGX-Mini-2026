@@ -178,7 +178,8 @@ function(apply_lib_patches EXTERNAL_DIR)
     ogxm_apply_patch_series("Bluepad32 Switch parser" "${BLUEPAD32_PATH}"
         "${EXTERNAL_DIR}/patches/bluepad32_switch_enable_vibration.diff"
         "${EXTERNAL_DIR}/patches/bluepad32_switch_setup_robustness.diff"
-        "${EXTERNAL_DIR}/patches/bluepad32_switch_request_sleep.diff")
+        "${EXTERNAL_DIR}/patches/bluepad32_switch_request_sleep.diff"
+        "${EXTERNAL_DIR}/patches/bluepad32_switch_idle_rumble_refresh.diff")
 
     # Pico SDK 2.1.x still lists BTstack's old hids_client.c; Bluepad32's BTstack
     # v1.8 renamed it to hids_host.c. Patch the SDK cmake when using that tree.
