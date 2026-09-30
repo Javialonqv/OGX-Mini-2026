@@ -1,4 +1,5 @@
 #include <algorithm>
+#include <cstddef>
 #include <cstring>
 
 #include "USBDevice/DeviceDriver/Steam/Steam.h"
@@ -77,10 +78,21 @@ void SteamDevice::process(const uint8_t idx, Gamepad& gamepad)
 	}
 
 	if (new_report_out_) {
-		Gamepad::PadOut gp_out;
-		gp_out.rumble_l = report_out_.motor_left;
-		gp_out.rumble_r = report_out_.motor_right;
-		gamepad.set_pad_out(gp_out);
+		/* Rumble flags as hosts send them (SDL HIDAPI PS5, Linux hid-playstation, inputtino):
+		 * motors are valid with compatible vibration in valid_flag0 (0x01) or its "improved
+		 * rumble" form in valid_flag2 (0x04); every valid flag clear is SDL's stop. Other
+		 * reports (e.g. lightbar-only) leave the running rumble alone. */
+		const uint8_t flag0 = report_out_.control_flag[0];
+		const uint8_t flag1 = report_out_.control_flag[1];
+		const uint8_t flag2 = report_out_.led_control_flag;   // valid_flag2
+		if ((flag0 & 0x01) || (flag2 & 0x04)) {
+			Gamepad::PadOut gp_out;
+			gp_out.rumble_l = report_out_.motor_left;
+			gp_out.rumble_r = report_out_.motor_right;
+			gamepad.set_pad_out(gp_out);
+		} else if (flag0 == 0 && flag1 == 0 && flag2 == 0) {
+			gamepad.set_pad_out(Gamepad::PadOut());
+		}
 		new_report_out_ = false;
 	}
 }
@@ -96,8 +108,10 @@ uint16_t SteamDevice::get_report_cb(uint8_t itf, uint8_t report_id, hid_report_t
 			return n;
 		}
 		if (itf == Steam::ITF_GAMEPAD && (report_id == 0 || report_id == kReportIdIn)) {
-			const uint16_t n = static_cast<uint16_t>(std::min<size_t>(reqlen, report_in_.size()));
-			std::memcpy(buffer, report_in_.data(), n);
+			/* With a report ID, TinyUSB already puts it in front of the buffer: skip ours. */
+			const size_t skip = (report_id == 0) ? 0 : 1;
+			const uint16_t n = static_cast<uint16_t>(std::min<size_t>(reqlen, report_in_.size() - skip));
+			std::memcpy(buffer, report_in_.data() + skip, n);
 			return n;
 		}
 	} else if (report_type == HID_REPORT_TYPE_FEATURE) {
@@ -122,9 +136,15 @@ void SteamDevice::set_report_cb(uint8_t itf, uint8_t report_id, hid_report_type_
 		buf = &buffer[1];
 	}
 
-	if ((rid == PS5::OutReportID::RUMBLE || rid == PS5::OutReportID::CONTROL) &&
-	    len >= sizeof(PS5::OutReport)) {
-		std::memcpy(&report_out_, buf, sizeof(PS5::OutReport));
+	/* buf holds the report after its ID (47 bytes for report 0x02), while PS5::OutReport starts
+	 * with the ID field: the old size check dropped every report. Copy the body after the ID
+	 * field; it must reach at least the lightbar colour. */
+	constexpr size_t kMinBody = offsetof(PS5::OutReport, lightbar_blue);
+	if ((rid == PS5::OutReportID::RUMBLE || rid == PS5::OutReportID::CONTROL) && len >= kMinBody) {
+		report_out_ = PS5::OutReport();
+		uint8_t* out = reinterpret_cast<uint8_t*>(&report_out_);
+		out[0] = rid;
+		std::memcpy(out + 1, buf, std::min<size_t>(len, sizeof(PS5::OutReport) - 1));
 		new_report_out_ = true;
 	}
 }
