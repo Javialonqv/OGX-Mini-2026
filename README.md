@@ -1,3 +1,9 @@
+# WARNING
+This _fork_ was **100% VIBE-CODED**.\
+Even thought I was the one who had to make witchcraft to get it to compile, _ChatGPT_ was the only one who ever touched the code (and it seems to work).
+This project is of course provided as-is and does not guarantee it will work.
+This is just a dumb experiemnt I made to get my **GameSir G7 Pro ZZZ** working with the **OGX-Mini** project for my **Raspberry Pi Pico W**.
+
 # OGX-Mini 2026
 
 **Support development** — If this firmware helps you, consider **[donating on Ko-fi](https://ko-fi.com/megacadedev)**. Donations fund hardware I can test on (see [Support policy](#support-policy)).
