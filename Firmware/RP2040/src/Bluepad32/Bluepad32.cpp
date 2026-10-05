@@ -183,6 +183,9 @@ static_assert(FEEDBACK_TIME_MS == switch_rumble::kFeedbackPeriodMs, "keep Bluepa
 /* Neutral rumble refresh for Switch pads while idle (see Bluepad32/RumbleRefresh.h). */
 static switch_rumble::IdleRefresh s_sw_idle_rumble[CONFIG_BLUEPAD32_MAX_DEVICES];
 static constexpr uint32_t LED_CHECK_TIME_MS = 500;
+#if defined(CONFIG_EN_BLUETOOTH) && defined(CONFIG_TARGET_PICO_W)
+static bool any_bt_connect_in_progress();
+#endif
 /** Idle pairing health check — restarts BR/LE scan if they died during long USB suspend (e.g. 360 standby). */
 static constexpr uint32_t PAIRING_WATCHDOG_MS = 45000;
 /** If no HID input report reaches us for this long while "connected", the BT link is zombie
@@ -648,6 +651,9 @@ static void maybe_restart_ble_scan_after_disconnect(int disconnected_idx) {
         uni_hid_device_t* d = uni_hid_device_get_instance_for_idx(static_cast<int>(i));
         if (!d || uni_bt_conn_get_state(&d->conn) != UNI_BT_CONN_STATE_DEVICE_READY)
             continue;
+        /* Classic BR/EDR ACL also shares the CYW43 radio with LE scanning. */
+        if (gap_get_connection_type(d->conn.handle) == GAP_CONNECTION_ACL)
+            return;
         if (device_is_ble_hogp(d))
             return;
         /* Solo Switch Joy-Con keeps LE scan off while waiting for partner over Classic BT. */
@@ -701,15 +707,14 @@ static void drop_incomplete_ble_slots(void) {
 static void restore_bt_pairing_mode(int disconnected_idx);
 
 #if defined(CONFIG_EN_BLUETOOTH) && defined(CONFIG_TARGET_PICO_W)
-/** True while a BLE pad is connected but not yet DEVICE_READY (pairing / DIS / HIDS). */
-static bool any_ble_connect_in_progress() {
+/** True while any Bluetooth pad slot is active but not yet DEVICE_READY. */
+static bool any_bt_connect_in_progress() {
     for (uint8_t i = 0; i < CONFIG_BLUEPAD32_MAX_DEVICES; ++i) {
         uni_hid_device_t* d = uni_hid_device_get_instance_for_idx(static_cast<int>(i));
-        if (!d || d->conn.handle == UNI_BT_CONN_HANDLE_INVALID)
+        if (!d)
             continue;
-        if (uni_bt_conn_get_state(&d->conn) == UNI_BT_CONN_STATE_DEVICE_READY)
-            continue;
-        if (gap_get_connection_type(d->conn.handle) == GAP_CONNECTION_LE)
+        const auto state = uni_bt_conn_get_state(&d->conn);
+        if (state > UNI_BT_CONN_STATE_DEVICE_NONE && state < UNI_BT_CONN_STATE_DEVICE_READY)
             return true;
     }
     return false;
@@ -720,9 +725,9 @@ static bool is_pairing_idle() {
     if (board_api::usb::host_any_pad_mounted())
         return false;
 #endif
-    /* Mid HOGP discovery still looks "disconnected" to bt_devices_[], but scans
-     * must stay off or Triton's HIDS discovery never finishes. */
-    if (any_ble_connect_in_progress())
+    /* Pairing / HID discovery still looks disconnected to bt_devices_[], but scans
+     * must stay off while a Bluetooth link is being initialized. */
+    if (any_bt_connect_in_progress())
         return false;
     return !any_connected();
 }
@@ -950,6 +955,8 @@ static uni_error_t device_ready_cb(uni_hid_device_t* device) {
         gap_advertisements_enable(0);
     } else if (gap_get_connection_type(device->conn.handle) == GAP_CONNECTION_ACL) {
         gap_advertisements_enable(0);
+        /* A continuous LE scan competes with Classic HID interrupt traffic on the CYW43. */
+        uni_bt_le_scan_stop();
         if (uni_hid_parser_switch_solo_needs_partner(device)) {
             /* Solo Joy-Con (L or R): keep inquiry + page scan for the partner; pause BLE scan. */
             uni_bt_le_scan_stop();
